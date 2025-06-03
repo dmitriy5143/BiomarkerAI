@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Запуск RAG‑пайплайна</title>
+  <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+  <div class="container">
+    <h1>Bio Marker AI</h1>
+    <form id="pipeline-form" method="POST" action="{{ url_for('run_pipeline') }}" enctype="multipart/form-data">
+      <div class="form-group">
+        <label for="excel_file">Загрузите Excel‑файл</label>
+        <input type="file" class="form-control-file" id="excel_file" name="excel_file" required accept=".xlsx,.xls">
+      </div>
+      <div class="form-group">
+        <label for="class_zero">Количество образцов класса 0</label>
+        <input type="number" class="form-control" id="class_zero" name="class_zero" placeholder="Введите число" required>
+      </div>
+      <div class="form-group">
+        <label for="disease_info">Информация о заболевании</label>
+        <textarea class="form-control" id="disease_info" name="disease_info" rows="3" placeholder="Введите описание">
+Necrotizing enterocolitis. Gastrointestinal tract disease, affects children with low body weight, characterized by high mortality.
+        </textarea>
+      </div>
+      <div class="form-group">
+        <label for="experiment_conditions">Условия эксперимента</label>
+        <textarea class="form-control" id="experiment_conditions" name="experiment_conditions" rows="3" placeholder="Введите условия эксперимента">
+Analysis of children's blood plasma samples by HILIC chromatography.
+        </textarea>
+      </div>
+      <div class="form-group">
+        <label for="population_size">Размер популяции</label>
+        <input type="number" class="form-control" id="population_size" name="population_size" placeholder="Например, 100">
+      </div>
+      <div class="form-group">
+        <label for="n_generations">Количество итераций</label>
+        <input type="number" class="form-control" id="n_generations" name="n_generations" placeholder="Например, 10">
+      </div>
+      <div class="form-group form-check">
+        <input type="checkbox" class="form-check-input" id="rebuild_rag" name="rebuild_rag">
+        <label class="form-check-label" for="rebuild_rag">
+          Запустить режим сборки векторного хранилища
+        </label>
+      </div>
+      <div id="test-mode-fields" style="display: none;">
+        <div class="form-group">
+          <label for="max_archives">Количество архивов для обработки</label>
+          <input type="number" class="form-control" id="max_archives" name="max_archives" placeholder="Например, 5">
+        </div>
+        <div class="form-group">
+          <label for="keywords">Ключевые слова для подбора статей</label>
+          <textarea class="form-control" id="keywords" name="keywords" rows="3" placeholder="Например: NNEC: necrotizing, enterocolitis; biomarkers: crp, interleukin"></textarea>
+        </div>
+      </div>
+      <button type="submit" class="btn btn-primary btn-block">Запустить поиск</button>
+    </form>
+    <div class="spinner" id="loading-spinner"></div>
+    
+    <div id="loss-result" style="display: none;">
+      <h3>Значение функции потерь</h3>
+      <div class="loss-container">
+        <strong>Финальное значение: </strong>
+        <span id="loss-value" class="loss-value"></span>
+      </div>
+    </div>
+    
+    <div id="visualization-results" style="display: none;">
+      <h3>Визуализация</h3>
+      <div id="plots-container"></div>
+    </div>
+    
+    <div id="llm-results" style="display: none;">
+      <h3>Результаты анализа LLM</h3>
+      <div id="llm-content"></div>
+    </div>
+  </div>
+  <script src="https://code.jquery.com/jquery-3.5.1.slim.min.js"></script>
+  <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.bundle.min.js"></script>
+  <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+  <script>
+    document.addEventListener("DOMContentLoaded", function() {
+      const rebuildCheckbox = document.getElementById("rebuild_rag");
+      const testModeFields = document.getElementById("test-mode-fields");
+      rebuildCheckbox.addEventListener("change", function() {
+        testModeFields.style.display = rebuildCheckbox.checked ? "block" : "none";
+      });
+    });
+  </script>
+</body>
+</html>

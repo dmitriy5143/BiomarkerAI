@@ -1,0 +1,42 @@
+version: "3.8"
+services:
+  web:
+    build: .
+    container_name: flask-app
+    ports:
+      - "8080:8080"
+    environment:
+      - FLASK_CONFIG=production
+      - REDIS_HOST=redis
+      - LOG_DIR=/app/logs
+    depends_on:
+      - redis
+    restart: always
+    volumes:
+      - ./logs:/app/logs
+      - ./oa_noncomm_xml_archives:/app/oa_noncomm_xml_archives
+      - ./oa_noncomm_xml_archives/extracted:/app/oa_noncomm_xml_archives/extracted
+      - ./oa_noncomm_xml_archives/processed:/app/oa_noncomm_xml_archives/processed
+      - ./oa_noncomm_xml_archives/filtered:/app/oa_noncomm_xml_archives/filtered
+      - ./static/plots:/app/static/plots
+      - ./test_faiss_index:/app/test_faiss_index
+      - ./instance:/app/instance
+      - ./templates:/app/templates
+      - ./static:/app/static
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+  redis:
+    image: redis:7
+    container_name: redis_db
+    ports:
+      - "6379:6379"
+    restart: always
+    volumes:
+      - redis_data:/data
+volumes:
+  redis_data:
