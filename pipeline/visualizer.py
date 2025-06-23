@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 from sklearn.model_selection import StratifiedShuffleSplit
 from sklearn.cross_decomposition import PLSRegression
 from sklearn.metrics import make_scorer
-from pipeline.genetic import FitnessEvaluator
+from pipeline.fitness_evaluator import FitnessEvaluator
 import os
 import numpy as np
 import pandas as pd
@@ -73,4 +73,22 @@ class Visualizer:
         return {
             "url": f"/static/plots/{filename}",
             "title": "Коэффициенты модели"
+        }
+    
+    def plot_entropy_evolution(self, entropy_history, save_path="static/plots"):
+        os.makedirs(save_path, exist_ok=True)
+        plt.figure(figsize=(10, 8))
+        plt.plot(range(len(entropy_history)), entropy_history, marker='o', linestyle='-', color='purple')
+        plt.title("Эволюция энтропии популяции")
+        plt.xlabel("Поколение")
+        plt.ylabel("Средняя энтропия")
+        plt.grid(True)
+        plt.tight_layout()
+        filename = f"entropy_evolution_{int(time.time())}.png"
+        filepath = os.path.join(save_path, filename)
+        plt.savefig(filepath)
+        plt.close()
+        return {
+            "url": f"/static/plots/{filename}",
+            "title": "Эволюция Энтропии Популяции"
         }

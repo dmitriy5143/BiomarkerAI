@@ -1,4 +1,3 @@
-
 import os
 import re
 import json
@@ -7,10 +6,10 @@ import logging
 import torch
 import redis
 from typing import List, Optional, Tuple
-from transformers import (AutoTokenizer, AutoModelForCausalLM, BitsAndBytesConfig, pipeline)
+from transformers import (AutoTokenizer, AutoModelForCausalLM, pipeline)
 from langchain_huggingface import HuggingFacePipeline, HuggingFaceEmbeddings
 from langchain.output_parsers import PydanticOutputParser
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 from pipeline.document_utils import DocumentUtils
 from config import config
 import warnings
@@ -28,8 +27,15 @@ class Source(BaseModel):
     doi: Optional[str] = None
     pmid: Optional[str] = None
 
+    @field_validator("pmid", "doi", mode="before")
+    @classmethod
+    def convert_to_str(cls, v):
+        if v is None:
+            return v
+        return str(v)
+
 class MetaboliteAnalysis(BaseModel):
-    answer: str = Field(..., description="Name or identifier of the biomarker")
+    answer: str = Field(..., description="Name of the metabolite")
     reasoning: str = Field(..., description="Provide a detailed, comprehensive analysis including biochemical properties, mechanisms of action, and specific relationship to the disease.")
     sources: List[Source] = Field(default_factory=list, description="List of source objects with metadata")
 
@@ -50,17 +56,17 @@ class CustomPydanticOutputParser(PydanticOutputParser):
             "  ]\n"
             "}\n"
             "```\n"
-            "Ensure all fields are present. If there is no data for a field, use an empty string or an empty array (for sources)."
+            "Ensure fields are present. If there is no data for a field, use an empty string or an empty array (for sources)."
         )
         return instructions
 
 class OptimizedRAGLLMAgent:
     def __init__(self,
-                 model_name: str = "TheBloke/Mistral-7B-Instruct-v0.2-GPTQ",  
-                 max_tokens: int = 500,
+                 model_name: str = "TheBloke/Mistral-7B-Instruct-v0.2-GPTQ",
+                 max_tokens: int = 1500, 
                  temperature: float = 0.6,
                  retry_attempts: int = 3,
-                 max_total_tokens: int = 1500):
+                 max_total_tokens: int = 4000): 
 
         self.model_name = model_name
         self.max_tokens = max_tokens
@@ -88,13 +94,60 @@ class OptimizedRAGLLMAgent:
         tokens = self.tokenizer.encode(text, add_special_tokens=True)
         return len(tokens)
 
-    def truncate_text(self, text: str, max_allowed_tokens: int) -> str:
-        tokens = self.tokenizer.encode(text, add_special_tokens=False)
-        if len(tokens) <= max_allowed_tokens:
-            return text
-        truncated_tokens = tokens[:max_allowed_tokens]
-        truncated_text = self.tokenizer.decode(truncated_tokens, skip_special_tokens=True)
-        return truncated_text
+    def extract_documents(self, context: str) -> List[Tuple[str, str]]:
+        pattern = re.compile(r"(Sources:\s*.+?\nSection:\s*.+?\nContent:\s*)(.+?)(?=\n\nSources:|$)", re.DOTALL)
+        docs = pattern.findall(context)
+        return docs
+
+    def truncate_content_for_document(self, content: str, max_tokens: int, tokenizer) -> str:
+        tokens = tokenizer.encode(content, add_special_tokens=False)
+        if len(tokens) <= max_tokens:
+            return content
+        truncated_tokens = tokens[:max_tokens]
+        return tokenizer.decode(truncated_tokens, skip_special_tokens=True)
+
+    def intelligent_truncate_context(self, full_context: str, max_allowed_tokens: int, tokenizer) -> str:
+        prefix = ""
+        context_body = full_context
+        prefix_pattern = r"^(Additional context from the literature:\s*)"
+        prefix_match = re.match(prefix_pattern, full_context, re.IGNORECASE)
+        if prefix_match:
+            prefix = prefix_match.group(1).strip()
+            context_body = full_context[len(prefix_match.group(0)) :].strip()
+
+        documents = self.extract_documents(context_body)
+
+        metadata_tokens_counts = []
+        for metadata, _ in documents:
+            count = tokenizer.encode(metadata, add_special_tokens=False)
+            metadata_tokens_counts.append(len(count))
+
+        total_metadata_tokens = sum(metadata_tokens_counts)
+        prefix_tokens = len(tokenizer.encode(prefix, add_special_tokens=False)) if prefix else 0
+
+        available_for_contents = max_allowed_tokens - total_metadata_tokens - prefix_tokens
+        if available_for_contents <= 0:
+            available_for_contents = 0
+
+        num_docs = len(documents)
+        base_allocation = available_for_contents // num_docs
+        extra_tokens = available_for_contents - (base_allocation * num_docs)
+
+        truncated_docs = []
+        for i, (metadata, content) in enumerate(documents):
+            allocated_tokens = base_allocation
+            if i < extra_tokens:
+                allocated_tokens += 1
+
+            truncated_content = self.truncate_content_for_document(content, allocated_tokens, tokenizer)
+            doc_text = f"{metadata}{truncated_content}"
+            truncated_docs.append(doc_text)
+
+        final_context = ""
+        if prefix:
+            final_context += prefix + "\n\n"
+        final_context += "\n\n".join(truncated_docs)
+        return final_context
 
     def preprocess_metabolite_text(self, full_text: str) -> str:
         def extract_block(text: str, header: str) -> str:
@@ -166,21 +219,21 @@ class OptimizedRAGLLMAgent:
         simple_text = self.preprocess_metabolite_text(full_metabolite_text)
         query_base = self.formulate_query_base(simple_text, disease_info, experiment_conditions)
         base_token_count = self.count_tokens(query_base)
-        source_docs = DocumentUtils.retrieve_documents(query_base, top_k=1)
-        
+        source_docs = DocumentUtils.retrieve_documents(query_base, top_k=2)
+
         docs_context = "\n\n".join([
             f"Sources: {doc['file_metadata'].get('title', 'N/A')}\n"
             f"Section: {doc['doc_metadata'].get('section', 'N/A')}\n"
-            f"Content: {doc['content'][:500]}"
+            f"Content: {doc['content']}" 
             for doc in source_docs
         ])
         extracted_context = f"Additional context from the literature:\n{docs_context}"
         full_query = query_base.replace("[/INST]", f"{extracted_context}\n[/INST]")
         total_tokens = self.count_tokens(full_query)
-        
+
         if total_tokens > self.max_total_tokens:
             allowed_context_tokens = self.max_total_tokens - base_token_count + self.count_tokens("[/INST]")
-            truncated_context = self.truncate_text(extracted_context, allowed_context_tokens)
+            truncated_context = self.intelligent_truncate_context(extracted_context, allowed_context_tokens, self.tokenizer)
             final_prompt = query_base.replace("[/INST]", f"{truncated_context}\n[/INST]")
         else:
             final_prompt = full_query
@@ -201,7 +254,7 @@ class OptimizedRAGLLMAgent:
                 logger.error("Error during LLM call: %s", ex)
             attempt += 1
             time.sleep(1)
-        
+
         final_json_text = DocumentUtils.extract_json_from_code_block(raw_response)
         if not final_json_text:
             logger.error("Failed to extract JSON from LLM response.")

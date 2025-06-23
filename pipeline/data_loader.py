@@ -27,7 +27,7 @@ class DataLoader:
         combined_array = np.concatenate((zeros, ones))
         labels = pd.Series(combined_array)
 
-        return samples_df, labels, hmdb_ids
+        return samples_df.astype(float), labels, hmdb_ids
 
     def get_metabolite_info(self, hmdb_df: pd.DataFrame, hmdb_ids: pd.DataFrame) -> pd.DataFrame:
         normalized_ids = []

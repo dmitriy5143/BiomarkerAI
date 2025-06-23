@@ -4,7 +4,6 @@ import json
 import logging
 import redis
 import re
-import time
 from typing import List
 import pubmed_parser as pp
 from langchain.docstore.document import Document
@@ -112,12 +111,10 @@ def build_rag_system():
         return None
 
     logger.info("Вычисление эмбеддингов для %d документов...", len(docs))
-    start_time = time.time()
 
     vectorstore = FAISS.from_documents(docs, EMBEDDINGS)
 
-    elapsed = time.time() - start_time
-    logger.info("Векторное хранилище построено с %d документами за %.2f секунд.", len(docs), elapsed)
+    logger.info("Векторное хранилище построено с %d документами.", len(docs))
     vectorstore.save_local(current_config.FAISS_INDEX_PATH)
 
     return vectorstore

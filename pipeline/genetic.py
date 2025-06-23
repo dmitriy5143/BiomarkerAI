@@ -1,9 +1,9 @@
 import numpy as np
 from sklearn.model_selection import StratifiedShuffleSplit
 import pandas as pd
-from sklearn.metrics import roc_auc_score, accuracy_score, roc_curve, make_scorer
+from sklearn.metrics import make_scorer
 from sklearn.cross_decomposition import PLSRegression
-from sklearn.model_selection import train_test_split, cross_val_score
+from pipeline.fitness_evaluator import FitnessEvaluator
 from pymoo.optimize import minimize
 from pymoo.algorithms.soo.nonconvex.ga import GA
 from pymoo.operators.selection.tournament import TournamentSelection
@@ -15,43 +15,6 @@ from joblib import parallel_backend
 from pymoo.core.population import Population
 from pymoo.core.individual import Individual
 from pymoo.core.termination import Termination
-
-class FitnessEvaluator:
-    @staticmethod
-    def evaluate_pls_model(features, target, n_components, sss, accuracy_scorer):
-        pls = PLSRegression(n_components=n_components, scale=True)
-        with parallel_backend('loky', n_jobs=-1):
-            scores = cross_val_score(pls, features, target, cv=sss, scoring=accuracy_scorer)
-        return scores.mean()
-
-    @staticmethod
-    def find_optimal_n_components(X, y, sss, accuracy_scorer, max_components=4):
-        n_features = X.shape[1]
-        if n_features == 0:
-          return 1
-        max_components = min(max_components, n_features)
-        accuracy_cv = []
-        for n_comp in range(1, max_components + 1):
-            score = FitnessEvaluator.evaluate_pls_model(X, y, n_comp, sss, accuracy_scorer)
-            accuracy_cv.append(score)
-        optimal_n_components = np.argmax(accuracy_cv) + 1
-        return optimal_n_components
-
-    @staticmethod
-    def find_optimal_threshold(y_true, y_pred_proba):
-        fpr, tpr, thresholds = roc_curve(y_true, y_pred_proba)
-        accuracies = []
-        for threshold in thresholds:
-            y_pred = (y_pred_proba >= threshold).astype(int)
-            accuracies.append(accuracy_score(y_true, y_pred))
-        optimal_idx = np.argmax(accuracies)
-        return thresholds[optimal_idx]
-
-    @staticmethod
-    def custom_accuracy(y_true, y_pred):
-        optimal_threshold = FitnessEvaluator.find_optimal_threshold(y_true, y_pred)
-        y_pred_class = (y_pred >= optimal_threshold).astype(int)
-        return accuracy_score(y_true, y_pred_class)
 
 class AdaptiveMySampling:
     def __init__(self, X, y, sss, accuracy_scorer, find_optimal_n_components, adaptation_rate=0.1, update_frequency=3, min_features=5, n_generations=25, initial_top_k=0.5, final_top_k=0.1):
@@ -265,7 +228,11 @@ class GeneticFeatureSelector:
             eliminate_duplicates=True
         )
 
+        entropy_history = []
+
         def callback(algorithm):
+            current_entropy = adaptive_sampling.compute_entropy(algorithm.pop)
+            entropy_history.append(current_entropy)
             problem.update_sampling(algorithm.pop)
 
         termination = EarlyStoppingTermination(max_generations=self.n_generations, target_loss=1e-4)
@@ -279,4 +246,9 @@ class GeneticFeatureSelector:
             save_history=True,
             callback=callback
         )
-        return res.X, res.F
+        return {
+            "mask": res.X,
+            "loss": res.F,
+            "entropy_history": entropy_history,
+            "algorithm_name": "VIP-GA"  
+        }

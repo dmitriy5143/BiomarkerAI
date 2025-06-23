@@ -9,20 +9,22 @@ services:
       - FLASK_CONFIG=production
       - REDIS_HOST=redis
       - LOG_DIR=/app/logs
+      - XDG_RUNTIME_DIR=/tmp
     depends_on:
       - redis
-    restart: always
+    restart: no
     volumes:
       - ./logs:/app/logs
+      - ./data:/app/data
       - ./oa_noncomm_xml_archives:/app/oa_noncomm_xml_archives
       - ./oa_noncomm_xml_archives/extracted:/app/oa_noncomm_xml_archives/extracted
       - ./oa_noncomm_xml_archives/processed:/app/oa_noncomm_xml_archives/processed
       - ./oa_noncomm_xml_archives/filtered:/app/oa_noncomm_xml_archives/filtered
       - ./static/plots:/app/static/plots
-      - ./test_faiss_index:/app/test_faiss_index
       - ./instance:/app/instance
       - ./templates:/app/templates
       - ./static:/app/static
+      - models_cache:/app/model_cache
     deploy:
       resources:
         reservations:
@@ -30,13 +32,49 @@ services:
             - driver: nvidia
               count: all
               capabilities: [gpu]
+  
+  celery:
+    build: .
+    container_name: celery-worker
+    command: celery -A celery_app.celery worker --loglevel=info --pool=solo
+    environment:
+      - FLASK_CONFIG=production
+      - REDIS_HOST=redis
+      - LOG_DIR=/app/logs
+      - PYTHONPATH=/app 
+      - PYTHONUNBUFFERED=1
+      - FORKED_BY_MULTIPROCESSING=1
+      - XDG_RUNTIME_DIR=/tmp
+    depends_on:
+      - redis
+    restart: no
+    volumes:
+      - ./logs:/app/logs
+      - ./data:/app/data
+      - ./oa_noncomm_xml_archives:/app/oa_noncomm_xml_archives
+      - ./static/plots:/app/static/plots
+      - ./instance:/app/instance
+      - ./templates:/app/templates
+      - ./static:/app/static
+      - models_cache:/app/model_cache
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+  
   redis:
     image: redis:7
     container_name: redis_db
     ports:
       - "6379:6379"
-    restart: always
+    restart: no
+    command: ["redis-server", "--appendonly", "no", "--save", ""]
     volumes:
       - redis_data:/data
+
 volumes:
   redis_data:
+  models_cache:

@@ -2,6 +2,8 @@
   --primary-color: #3498db;
   --secondary-color: #2c3e50;
   --success-color: #2ecc71;
+  --warning-color: #f39c12;
+  --danger-color: #e74c3c;
   --light-gray: #f5f5f5;
   --dark-gray: #333;
   --box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
@@ -33,6 +35,13 @@ h1 {
   border-bottom: 2px solid var(--light-gray);
 }
 
+h4 {
+  color: var(--secondary-color);
+  margin-top: 1.5rem;
+  margin-bottom: 1rem;
+  font-size: 1.1rem;
+}
+
 .form-group {
   margin-bottom: 1.5rem;
 }
@@ -45,7 +54,8 @@ h1 {
 }
 
 .form-control,
-.form-control-file {
+.form-control-file,
+select {
   width: 100%;
   padding: 0.75rem;
   border: 1px solid #ddd;
@@ -54,9 +64,10 @@ h1 {
   transition: var(--transition);
 }
 
-.form-control:focus {
+.form-control:focus,
+select:focus {
   border-color: var(--primary-color);
-  box-shadow: 0 0 0 0.2rem rgba(52,152,219,0.25);
+  box-shadow: 0 0 0 0.2rem rgba(52, 152, 219, 0.25);
   outline: none;
 }
 
@@ -97,20 +108,135 @@ h1 {
   }
 }
 
-#visualization-results {
+#progress-container {
   margin-top: 2rem;
-  padding-top: 1rem;
-  border-top: 2px solid var(--light-gray);
+  padding: 1.5rem;
+  background-color: #fff;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+  border: 1px solid #eee;
 }
 
-#llm-results {
-  margin-top: 2rem;
-  padding-top: 1rem;
-  border-top: 2px solid var(--light-gray);
+.progress-bar-container {
+  width: 100%;
+  height: 24px;
+  background-color: #f0f0f0;
+  border-radius: 12px;
+  overflow: hidden;
+  margin-bottom: 10px;
+  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.1);
 }
 
+.progress-bar {
+  height: 100%;
+  background: linear-gradient(to right, #3498db, #2ecc71);
+  width: 0%;
+  transition: width 0.5s ease;
+  border-radius: 12px;
+  position: relative;
+}
+
+.progress-text {
+  font-size: 0.9rem;
+  color: #666;
+  margin-bottom: 15px;
+  text-align: center;
+  font-weight: 500;
+}
+
+.current-operation-status {
+  padding: 15px;
+  background-color: #f9f9f9;
+  border-radius: 8px;
+  margin-bottom: 15px;
+  border-left: 4px solid var(--primary-color);
+  transition: var(--transition);
+}
+
+.archive-name {
+  font-weight: 600;
+  margin-bottom: 5px;
+  color: var(--secondary-color);
+}
+
+.archive-status {
+  color: #7f8c8d;
+  line-height: 1.5;
+}
+
+.log-container {
+  max-height: 200px;
+  overflow-y: auto;
+  border: 1px solid #eee;
+  border-radius: 8px;
+  padding: 10px;
+  background-color: #fafafa;
+  margin-top: 1rem;
+}
+
+.operation-log {
+  font-family: monospace;
+  font-size: 0.85rem;
+  line-height: 1.5;
+}
+
+.log-entry {
+  padding: 8px 10px;
+  border-bottom: 1px solid #f0f0f0;
+  transition: background-color 0.2s ease;
+}
+
+.log-entry:hover {
+  background-color: #f5f5f5;
+}
+
+.log-entry:last-child {
+  border-bottom: none;
+}
+
+.log-entry.downloading {
+  color: var(--primary-color);
+  border-left: 3px solid var(--primary-color);
+  padding-left: 7px;
+}
+
+.log-entry.extracting {
+  color: var(--warning-color);
+  border-left: 3px solid var(--warning-color);
+  padding-left: 7px;
+}
+
+.log-entry.completed {
+  color: var(--success-color);
+  border-left: 3px solid var(--success-color);
+  padding-left: 7px;
+}
+
+.log-entry.error {
+  color: var(--danger-color);
+  border-left: 3px solid var(--danger-color);
+  padding-left: 7px;
+}
+
+@keyframes pulse {
+  0% { box-shadow: 0 0 0 0 rgba(52, 152, 219, 0.4); }
+  70% { box-shadow: 0 0 0 10px rgba(52, 152, 219, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(52, 152, 219, 0); }
+}
+
+.current-operation-status.active {
+  animation: pulse 2s infinite;
+}
+
+#visualization-results,
+#llm-results,
 #loss-result {
   margin-top: 2rem;
+  padding-top: 1rem;
+  border-top: 2px solid var(--light-gray);
+}
+
+.loss-container {
   padding: 1rem;
   background-color: var(--light-gray);
   border-radius: 4px;
@@ -130,6 +256,12 @@ h1 {
   border-radius: 8px;
   background-color: #fff;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.llm-result-item:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
 }
 
 .llm-result-item h4 {
@@ -139,11 +271,6 @@ h1 {
   font-size: 1.2rem;
   border-bottom: 1px solid var(--light-gray);
   padding-bottom: 0.5rem;
-}
-
-.metabolite-summary {
-  margin-bottom: 1rem;
-  line-height: 1.5;
 }
 
 .metabolite-analysis {
@@ -179,4 +306,24 @@ h1 {
 .result-plot {
   max-width: 100%;
   margin-bottom: 1rem;
+  border-radius: 4px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  transition: transform 0.2s ease;
+}
+
+.result-plot:hover {
+  transform: scale(1.02);
+}
+
+#download-report {
+  margin-top: 2rem;
+  text-align: center;
+}
+
+#download-report .btn {
+  background-color: var(--success-color);
+}
+
+#download-report .btn:hover {
+  background-color: #27ae60;
 }

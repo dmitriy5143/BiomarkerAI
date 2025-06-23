@@ -28,6 +28,9 @@ class BaseConfig:
     CHUNK_OVERLAP   = int(os.environ.get("CHUNK_OVERLAP", 150))
     
     BASE_URL = os.environ.get("BASE_URL", "https://ftp.ncbi.nlm.nih.gov/pub/pmc/oa_bulk/oa_noncomm/xml/")
+    MAX_MEMORY_LIMIT_BYTES = int(os.environ.get("MAX_MEMORY_LIMIT_BYTES", 1 * 1024 * 1024 * 1024))
+    AVERAGE_XML_SIZE_BYTES = int(os.environ.get("AVERAGE_XML_SIZE_BYTES", 100 * 1024))
+    MAX_ARCHIVE_SIZE_MB = int(os.environ.get("MAX_ARCHIVE_SIZE_MB", 500))
     
     KEYWORDS = {
         "NNEC": [
@@ -44,6 +47,9 @@ class BaseConfig:
             "glyco-redox", "gut microbiome", "fucose", "microbial metabolites"
         ]
     }
+
+    CELERY_BROKER_URL = f"redis://{REDIS_HOST}:{REDIS_PORT}/{REDIS_DB}"
+    CELERY_RESULT_BACKEND = f"redis://{REDIS_HOST}:{REDIS_PORT}/{REDIS_DB}"
 
 class ProductionConfig(BaseConfig):
     DEBUG = False
