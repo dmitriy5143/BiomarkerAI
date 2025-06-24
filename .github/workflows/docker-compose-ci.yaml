@@ -22,7 +22,7 @@ jobs:
 
       - name: Build and run with docker-compose
         run: |
-          sed -i 's/build: \./build:\n      context: .\n      dockerfile: Dockerfile.ci/g' docker-compose.yml
+          sed -i 's/build: \./build:\n      context: .\n      dockerfile: Dockerfile.ci/g' docker-compose.yaml
           docker compose up -d
 
       - name: Wait for application to be ready
