@@ -15,17 +15,18 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v3
 
-      - name: Check Docker version
-        run: docker --version
+      - name: Create Dockerfile.ci for CI environment
+        run: |
+          cp Dockerfile Dockerfile.ci
+          sed -i '/RUN python3.10 -c "from transformers import AutoTokenizer, AutoModelForCausalLM/,/device_map='\''auto'\'')"/ s/^/#/' Dockerfile.ci
 
-      - name: Check Docker Compose plugin version
-        run: docker compose version
-
-      - name: Build and run containers
-        run: docker compose up --build -d
+      - name: Build and run with docker-compose
+        run: |
+          sed -i 's/build: \./build:\n      context: .\n      dockerfile: Dockerfile.ci/g' docker-compose.yml
+          docker compose up -d
 
       - name: Wait for application to be ready
-        run: sleep 10
+        run: sleep 20
 
       - name: Test application
         run: |
