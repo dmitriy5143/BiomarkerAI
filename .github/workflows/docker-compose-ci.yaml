@@ -12,17 +12,24 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    - uses: actions/checkout@v3
+      - name: Checkout repository
+        uses: actions/checkout@v3
 
-    - name: Build and run containers
-      run: docker-compose up --build -d
+      - name: Check Docker version
+        run: docker --version
 
-    - name: Wait for application to be ready
-      run: sleep 120
+      - name: Check Docker Compose plugin version
+        run: docker compose version
 
-    - name: Test application
-      run: |
-        curl -s --retry 3 --retry-delay 5 http://localhost:8080/ || exit 1
+      - name: Build and run containers
+        run: docker compose up --build -d
 
-    - name: Tear down containers
-      run: docker-compose down
+      - name: Wait for application to be ready
+        run: sleep 10
+
+      - name: Test application
+        run: |
+          curl -s --retry 3 --retry-delay 5 http://localhost:8080/ || exit 1
+
+      - name: Tear down containers
+        run: docker compose down
