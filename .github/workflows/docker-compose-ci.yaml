@@ -15,15 +15,38 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v3
 
-      - name: Create Dockerfile.ci for CI environment
+      - name: Check file existence and name
+        run: |
+          ls -la
+          if [ -f "docker-compose.yml" ]; then
+            echo "Found docker-compose.yml"
+            COMPOSE_FILE="docker-compose.yml"
+          elif [ -f "docker-compose.yaml" ]; then
+            echo "Found docker-compose.yaml"
+            COMPOSE_FILE="docker-compose.yaml"
+          else
+            echo "No docker-compose file found!"
+            find . -name "docker-compose*" -type f
+            exit 1
+          fi
+          echo "COMPOSE_FILE=${COMPOSE_FILE}" >> $GITHUB_ENV
+
+      - name: Create Dockerfile.ci
         run: |
           cp Dockerfile Dockerfile.ci
           sed -i '/RUN python3.10 -c "from transformers import AutoTokenizer, AutoModelForCausalLM/,/device_map='\''auto'\'')"/ s/^/#/' Dockerfile.ci
 
+      - name: Modify docker-compose file for CI
+        run: |
+          cp ${{ env.COMPOSE_FILE }} docker-compose.ci.yaml
+          
+          sed -i 's/build: \./build:\n      context: .\n      dockerfile: Dockerfile.ci/g' docker-compose.ci.yaml
+          
+          sed -i '/deploy:/,/capabilities: \[gpu\]/d' docker-compose.ci.yaml
+
       - name: Build and run with docker-compose
         run: |
-          sed -i 's/build: \./build:\n      context: .\n      dockerfile: Dockerfile.ci/g' docker-compose.yaml
-          docker compose up -d
+          docker compose -f docker-compose.ci.yaml up -d
 
       - name: Wait for application to be ready
         run: sleep 20
@@ -33,4 +56,4 @@ jobs:
           curl -s --retry 3 --retry-delay 5 http://localhost:8080/ || exit 1
 
       - name: Tear down containers
-        run: docker compose down
+        run: docker compose -f docker-compose.ci.yaml down
